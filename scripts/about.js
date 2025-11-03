@@ -71,7 +71,7 @@ async function bootstrap() {
     return;
   }
   try {
-    const response = await fetch('/ABOUT.md', { headers: { Accept: 'text/plain' } });
+    const response = await fetch('ABOUT.md', { headers: { Accept: 'text/plain' } });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }

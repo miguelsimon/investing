@@ -1,5 +1,14 @@
-export async function fetchProblem(url = '/problem.json') {
-  const response = await fetch(url, {
+function defaultProblemUrl() {
+  if (typeof window === 'undefined' || !window.location) {
+    return 'problem.json';
+  }
+  const base = window.location.pathname.replace(/[^/]*$/, '');
+  return `${base}problem.json`;
+}
+
+export async function fetchProblem(url) {
+  const requestUrl = url ?? defaultProblemUrl();
+  const response = await fetch(requestUrl, {
     headers: { Accept: 'application/json' },
   });
   if (!response.ok) {
