@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Allocation Simulator</title>
+    <style>
+      .allocation-layout {
+        display: flex;
+        gap: 1.5rem;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      #allocation-sidebar {
+        min-width: 240px;
+        max-width: 320px;
+      }
+      #allocation-list {
+        list-style: none;
+        padding: 0;
+        margin: 0 0 1rem;
+      }
+      #allocation-list li + li {
+        margin-top: 0.5rem;
+      }
+      #allocation-list button {
+        width: 100%;
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background: #f7f7f7;
+        cursor: pointer;
+      }
+      #allocation-list button.selected {
+        border-color: #1c64f2;
+        background: #e7f0ff;
+      }
+      #allocation-editor {
+        flex: 1;
+        min-width: 260px;
+      }
+      #weights-editor .weight-row {
+        margin-bottom: 0.5rem;
+      }
+      #weights-editor label {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+      }
+      #weights-editor input {
+        width: 120px;
+      }
+      .allocation-editor-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Allocation Simulator</h1>
+      <p>
+        This runs simulations on historical data to backtest a simple investment strategy.
+      </p>
+      <p>The strategy is:</p>
+      <ul>
+        <li>choose a holding time for the investment (default 1 year)</li>
+        <li>choose a weight allocation</li>
+      </ul>
+      <p>
+        We simulate the results for this strategy when applied to every day in our experimental
+        window.
+      </p>
+      <form id="allocation-form">
+        <div>
+          <label>
+            Start day (inclusive)
+            <input id="lower-bound" name="lower-bound" type="date" required />
+          </label>
+        </div>
+        <div>
+          <label>
+            End day (inclusive)
+            <input id="upper-bound" name="upper-bound" type="date" required />
+          </label>
+        </div>
+        <div>
+          <label>
+            Holding time (days)
+            <input id="holding-days" name="holding-days" type="number" min="1" value="365" required />
+          </label>
+        </div>
+        <div>
+          <label>
+            Initial capital
+            <input id="initial-capital" name="initial-capital" type="number" min="0" step="any" value="1000" required />
+          </label>
+        </div>
+        <fieldset>
+          <legend>Currency</legend>
+          <label>
+            <input type="radio" name="currency" value="USD" checked />
+            Constant USD
+          </label>
+          <label>
+            <input type="radio" name="currency" value="EUR" />
+            Constant EUR
+          </label>
+        </fieldset>
+        <section class="allocation-layout">
+          <div id="allocation-sidebar">
+            <h2>Allocations</h2>
+            <p id="allocation-help">Weights are nonnegative and must sum to 1.</p>
+            <ul id="allocation-list"></ul>
+            <button type="button" id="add-allocation">Add allocation</button>
+          </div>
+          <div id="allocation-editor">
+            <h2 id="allocation-editor-title">Allocation</h2>
+            <div id="weights-editor"></div>
+            <p id="allocation-editor-summary"></p>
+            <div class="allocation-editor-actions">
+              <button type="button" id="save-allocation" disabled>Save allocation</button>
+              <button type="button" id="remove-allocation">Remove allocation</button>
+            </div>
+          </div>
+        </section>
+      </form>
+      <div id="allocation-status" class="allocation-status"></div>
+      <section id="allocation-violin-section" hidden>
+        <h2>PnL Distribution</h2>
+        <div id="allocation-violin" style="width: 100%; max-width: 960px; min-height: 400px;"></div>
+      </section>
+      <section id="allocation-chart-section" hidden>
+        <h2>Profit and Loss</h2>
+        <div id="allocation-chart" style="width: 100%; max-width: 960px; min-height: 400px;"></div>
+      </section>
+    </main>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" crossorigin="anonymous"></script>
+    <script type="module" src="./scripts/allocation.js"></script>
+  </body>
+</html>

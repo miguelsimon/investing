@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Stocks Simulator</title>
+  </head>
+  <body>
+    <main>
+      <p id="status">Loading problem data…</p>
+      <section id="summary" hidden></section>
+      <section id="chart-section" hidden>
+        <h2>Constant-Dollar Growth</h2>
+        <div id="growth-chart" style="width: 100%; max-width: 960px;"></div>
+      </section>
+    </main>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" crossorigin="anonymous"></script>
+    <script type="module" src="./scripts/main.js"></script>
+  </body>
+</html>
