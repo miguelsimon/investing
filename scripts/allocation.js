@@ -1,6 +1,11 @@
 import { initNavigation } from './navigation.js';
-import { buildDayIndex, fetchProblem } from './problemData.js';
-import { getTickers, getSymbolDescriptions } from './problemView.js';
+import { fetchProblem } from './problemData.js';
+import {
+  findCommonDateRange,
+  getTickers,
+  getSymbolDescriptions,
+  renderTickerSelectionTable,
+} from './problemView.js';
 import {
   computeRollingSimulations,
   normalizeWeights,
@@ -26,14 +31,17 @@ const chartNode = document.getElementById('allocation-chart');
 const violinSection = document.getElementById('allocation-violin-section');
 const violinNode = document.getElementById('allocation-violin');
 const currencyRadios = document.querySelectorAll('input[name="currency"]');
+const tickerSelectionContainer = document.getElementById('ticker-selection');
+const tickerSelectionStatus = document.getElementById('ticker-selection-status');
 
 const DEFAULT_CURRENCY = 'USD';
 const CURRENCY_LABELS = { USD: 'constant USD', EUR: 'constant EUR' };
 const CURRENCY_UNITS = { USD: 'USD', EUR: 'EUR' };
 
 let problem = null;
-let dayLookup = new Map();
+let allTickers = [];
 let tickers = [];
+let selectedTickers = new Set();
 let symbolDescriptions = {};
 let priceSeriesByCurrency = {};
 let selectedCurrency = DEFAULT_CURRENCY;
@@ -41,8 +49,9 @@ const allocations = [];
 let selectedAllocationId = null;
 let isEditorDirty = false;
 let allocationIdCounter = 1;
-let allocationNameCounter = 1;
 let runTimeoutId = null;
+let currentRange = null;
+const ALLOCATION_LABEL_MAX = 20;
 
 function setDateInputValue(input, value) {
   if (!(input instanceof HTMLInputElement)) {
@@ -71,6 +80,145 @@ function setDateInputValue(input, value) {
     input.valueAsDate = date;
   } else {
     input.value = '';
+  }
+}
+
+function setSelectionStatus(message) {
+  if (!tickerSelectionStatus) {
+    return;
+  }
+  tickerSelectionStatus.textContent = message ?? '';
+}
+
+function renderTickerSelection() {
+  if (!tickerSelectionContainer) {
+    return;
+  }
+  tickerSelectionContainer.innerHTML = '';
+  const table = renderTickerSelectionTable(problem, {
+    selectedTickers: Array.from(selectedTickers),
+    onSelectionChange: (selection) => {
+      applyTickerSelection(new Set(selection));
+    },
+  });
+  tickerSelectionContainer.appendChild(table);
+}
+
+function applyTickerSelection(nextSelection) {
+  selectedTickers = new Set(nextSelection);
+  tickers = Array.from(selectedTickers);
+  resetAllocations();
+  updateDateRange();
+}
+
+function renderEmptyEditorState() {
+  weightsEditor.innerHTML = '';
+  const message = document.createElement('p');
+  message.className = 'weights-editor-empty';
+  message.textContent = 'Select at least one ticker to configure allocations.';
+  weightsEditor.appendChild(message);
+  editorSummary.textContent = 'No tickers selected.';
+}
+
+function resetAllocations() {
+  allocations.length = 0;
+  selectedAllocationId = null;
+  if (tickers.length === 0) {
+    renderAllocationList();
+    addAllocationButton.disabled = true;
+    setEditorDirty(false);
+    renderEmptyEditorState();
+    return;
+  }
+  addAllocationButton.disabled = false;
+
+  const primary = createAllocation(buildEqualWeights());
+  tickers.forEach((ticker) => {
+    const single = { [ticker]: 1 };
+    createAllocation(single);
+  });
+  renderAllocationList();
+  selectAllocation(primary.id, { force: true });
+}
+
+function getActivePriceProblem(currency) {
+  if (!problem) {
+    return null;
+  }
+  const series = getPriceSeriesForCurrency(currency);
+  if (!series) {
+    return null;
+  }
+  return {
+    days: problem.days,
+    price_in_constant_usd: series,
+  };
+}
+
+function clearDateInputs() {
+  setDateInputValue(lowerBoundInput, '');
+  setDateInputValue(upperBoundInput, '');
+  if (lowerBoundInput) {
+    delete lowerBoundInput.dataset.index;
+  }
+  if (upperBoundInput) {
+    delete upperBoundInput.dataset.index;
+  }
+}
+
+function updateDateRange(options = {}) {
+  const { triggerRun = true } = options;
+  if (!problem) {
+    return;
+  }
+  if (!lowerBoundInput || !upperBoundInput) {
+    return;
+  }
+  const selection = Array.from(selectedTickers);
+  if (selection.length === 0) {
+    currentRange = null;
+    clearDateInputs();
+    setSelectionStatus('Select at least one ticker to run the simulation.');
+    if (triggerRun) {
+      scheduleRun();
+    }
+    return;
+  }
+
+  const priceProblem = getActivePriceProblem(selectedCurrency);
+  if (!priceProblem) {
+    currentRange = null;
+    clearDateInputs();
+    setSelectionStatus(
+      `Problem data is missing ${getCurrencyLabel(selectedCurrency)} prices for the selected tickers.`,
+    );
+    if (triggerRun) {
+      scheduleRun();
+    }
+    return;
+  }
+
+  const range = findCommonDateRange(priceProblem, selection);
+  if (!range) {
+    currentRange = null;
+    clearDateInputs();
+    setSelectionStatus(
+      'Selected tickers do not share a common date range without missing values. Adjust your selection.',
+    );
+  } else {
+    currentRange = range;
+    const startDay = priceProblem.days?.[range.startIndex] ?? '';
+    const endDay = priceProblem.days?.[range.endIndex] ?? '';
+    setDateInputValue(lowerBoundInput, startDay);
+    setDateInputValue(upperBoundInput, endDay);
+    lowerBoundInput.dataset.index = String(range.startIndex);
+    upperBoundInput.dataset.index = String(range.endIndex);
+    setSelectionStatus(
+      `Using ${selection.length} ticker(s) from ${startDay} through ${endDay}.`,
+    );
+  }
+  if (triggerRun) {
+    scheduleRun();
   }
 }
 
@@ -148,7 +296,18 @@ function sanitizeWeights(weightMap) {
   return sanitized;
 }
 
-function createAllocation(weightMap, { name, normalize = true } = {}) {
+function buildAllocationLabel(allocation) {
+  const index = allocations.findIndex((entry) => entry.id === allocation.id);
+  const numericIndex = index === -1 ? allocations.length + 1 : index + 1;
+  const entries = Object.entries(allocation.weights ?? {})
+    .filter(([, value]) => Number(value) > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const parts = entries.map(([ticker, value]) => `${ticker} ${Math.round(value * 100)}%`);
+  const base = parts.length > 0 ? `${numericIndex} ${parts.join(' ')}` : `${numericIndex} (no weights)`;
+  return base.length > ALLOCATION_LABEL_MAX ? base.slice(0, ALLOCATION_LABEL_MAX) : base;
+}
+
+function createAllocation(weightMap, { normalize = true } = {}) {
   let weights = sanitizeWeights(weightMap);
   if (normalize) {
     const { valid, weights: normalized } = normalizeWeights(weights);
@@ -161,10 +320,10 @@ function createAllocation(weightMap, { name, normalize = true } = {}) {
   }
   const allocation = {
     id: `allocation-${allocationIdCounter++}`,
-    name: name ?? `Allocation ${allocationNameCounter++}`,
     weights,
   };
   allocations.push(allocation);
+  allocation.name = buildAllocationLabel(allocation);
   return allocation;
 }
 
@@ -201,12 +360,18 @@ function buildConstantEurPrices(problemData) {
       return;
     }
     result[ticker] = series.map((value, index) => {
-      const price = Number(value);
-      const factor = Number(conversion[index]);
-      if (!Number.isFinite(price) || !Number.isFinite(factor)) {
+      const usdPrice = typeof value === 'number' ? value : Number.NaN;
+      if (!Number.isFinite(usdPrice) || usdPrice <= 0) {
         return Number.NaN;
       }
-      return price * factor;
+      const factorValue = typeof conversion[index] === 'number' ? conversion[index] : Number.NaN;
+      if (!Number.isFinite(factorValue) || factorValue <= 0) {
+        const day = days[index] ?? `index ${index}`;
+        throw new Error(
+          `Missing constant EUR conversion factor for ${ticker} on ${day}. Update problem data.`,
+        );
+      }
+      return usdPrice * factorValue;
     });
   });
   return result;
@@ -225,6 +390,8 @@ function buildPriceSeries(problemData) {
 function renderAllocationList() {
   allocationList.innerHTML = '';
   allocations.forEach((allocation) => {
+    const label = buildAllocationLabel(allocation);
+    allocation.name = label;
     const item = document.createElement('li');
     const button = document.createElement('button');
     button.type = 'button';
@@ -288,17 +455,21 @@ function updateEditorSummaryFromInputs() {
 }
 
 function loadAllocationIntoEditor(allocation) {
-  editorTitle.textContent = allocation.name;
+  const label = buildAllocationLabel(allocation);
+  allocation.name = label;
+  editorTitle.textContent = label;
   weightsEditor.innerHTML = '';
   tickers.forEach((ticker) => {
     const row = document.createElement('div');
     row.className = 'weight-row';
     const label = document.createElement('label');
-    label.textContent = ticker;
+    label.className = 'weight-label';
+    const labelText = document.createElement('span');
+    labelText.className = 'weight-label-text';
+    labelText.textContent = ticker;
     const description = symbolDescriptions[ticker];
     if (typeof description === 'string' && description.trim()) {
       label.title = description.trim();
-      label.classList.add('ticker-label');
     }
     const input = document.createElement('input');
     input.type = 'number';
@@ -307,6 +478,7 @@ function loadAllocationIntoEditor(allocation) {
     input.step = 'any';
     input.dataset.ticker = ticker;
     input.value = formatWeight(allocation.weights[ticker] ?? 0);
+    label.appendChild(labelText);
     label.appendChild(input);
     row.appendChild(label);
     weightsEditor.appendChild(row);
@@ -345,6 +517,7 @@ function saveCurrentAllocation() {
     return false;
   }
   allocation.weights = cloneWeights(weights);
+  allocation.name = buildAllocationLabel(allocation);
   loadAllocationIntoEditor(allocation);
   renderAllocationList();
   const { normalized } = updateEditorSummaryFromInputs();
@@ -500,7 +673,7 @@ function renderChart(seriesCollection, startCapital, currency) {
       ticktext: percentTickText,
       showgrid: false,
     },
-    margin: { t: 50, r: 70, b: 60, l: 70 },
+    margin: { t: 50, r: 140, b: 60, l: 160 },
   };
 
   const config = { responsive: true };
@@ -511,6 +684,7 @@ function renderChart(seriesCollection, startCapital, currency) {
   });
   globalThis.Plotly.react(chartNode, [...traces, y2StubTrace], layout, config);
   chartSection.hidden = false;
+  schedulePlotResize(chartNode);
 }
 
 function renderViolin(seriesCollection, startCapital, currency) {
@@ -554,7 +728,7 @@ function renderViolin(seriesCollection, startCapital, currency) {
     },
     violingap: 0.2,
     violingroupgap: 0.3,
-    margin: { t: 50, r: 40, b: 60, l: 80 },
+    margin: { t: 50, r: 100, b: 60, l: 160 },
     legend: { orientation: 'h' },
   };
 
@@ -565,6 +739,7 @@ function renderViolin(seriesCollection, startCapital, currency) {
   });
   globalThis.Plotly.react(violinNode, traces, layout, config);
   violinSection.hidden = false;
+  schedulePlotResize(violinNode);
 }
 
 function summarizeResults(results, startCapital, currency) {
@@ -658,17 +833,6 @@ function summarizeResults(results, startCapital, currency) {
   statusNode.replaceChildren(infoLine, table);
 }
 
-function parseDay(input, label) {
-  const value = input?.value;
-  if (!value) {
-    throw new Error(`Missing ${label}`);
-  }
-  if (!dayLookup.has(value)) {
-    throw new Error(`Day ${value} not found in problem data`);
-  }
-  return dayLookup.get(value);
-}
-
 function handleError(error) {
   if (statusNode) {
     statusNode.textContent = `Unable to run simulation: ${error.message}`;
@@ -695,6 +859,18 @@ async function runSimulations() {
   if (!problem) {
     return;
   }
+  if (tickers.length === 0) {
+    if (statusNode) {
+      statusNode.textContent = 'Select at least one ticker to run the simulation.';
+    }
+    if (chartSection) {
+      chartSection.hidden = true;
+    }
+    if (violinSection) {
+      violinSection.hidden = true;
+    }
+    return;
+  }
   if (isEditorDirty) {
     handleError(new Error('Save the current allocation before running the simulation.'));
     return;
@@ -710,8 +886,11 @@ async function runSimulations() {
       throw new Error('Holding time must be a positive integer');
     }
 
-    const lowerIndex = parseDay(lowerBoundInput, 'start day');
-    const upperIndex = parseDay(upperBoundInput, 'end day');
+    if (!currentRange) {
+      throw new Error('Selected tickers do not share a common date range. Adjust your selection.');
+    }
+    const lowerIndex = currentRange.startIndex;
+    const upperIndex = currentRange.endIndex;
     if (lowerIndex >= upperIndex) {
       throw new Error('Start day must come before end day');
     }
@@ -759,28 +938,16 @@ async function runSimulations() {
 
 function initForm(problemData) {
   problem = problemData;
-  dayLookup = buildDayIndex(problem.days);
-  tickers = getTickers(problem);
+  allTickers = getTickers(problem);
+  selectedTickers = new Set(allTickers);
+  tickers = Array.from(selectedTickers);
   symbolDescriptions = getSymbolDescriptions(problem);
   priceSeriesByCurrency = buildPriceSeries(problem);
   selectedCurrency = resolveSelectedCurrency();
-  allocations.length = 0;
-  selectedAllocationId = null;
-  allocationIdCounter = 1;
-  const equalWeights = buildEqualWeights();
-  const initialAllocation = createAllocation(equalWeights);
-  renderAllocationList();
-  selectAllocation(initialAllocation.id, { force: true });
-  const firstDay = problem.days?.[0] ?? '';
-  const lastDay = problem.days?.[problem.days.length - 1] ?? '';
-  setDateInputValue(lowerBoundInput, firstDay);
-  setDateInputValue(upperBoundInput, lastDay);
-  if (typeof firstDay === 'string' && typeof lastDay === 'string') {
-    lowerBoundInput.min = firstDay;
-    lowerBoundInput.max = lastDay;
-    upperBoundInput.min = firstDay;
-    upperBoundInput.max = lastDay;
-  }
+  renderTickerSelection();
+  currentRange = null;
+  resetAllocations();
+  updateDateRange({ triggerRun: false });
   if (statusNode) {
     statusNode.textContent = `Simulation ready using ${getCurrencyLabel(selectedCurrency)}.`;
   }
@@ -842,8 +1009,6 @@ async function bootstrap() {
         scheduleRun();
       }
     });
-    lowerBoundInput.addEventListener('change', scheduleRun);
-    upperBoundInput.addEventListener('change', scheduleRun);
     holdingInput.addEventListener('change', scheduleRun);
     initialCapitalInput.addEventListener('change', scheduleRun);
     currencyRadios.forEach((radio) => {
@@ -860,8 +1025,12 @@ async function bootstrap() {
         if (violinSection) {
           violinSection.hidden = true;
         }
-        scheduleRun();
+        updateDateRange();
       });
+    });
+    window.addEventListener('resize', () => {
+      schedulePlotResize(chartNode);
+      schedulePlotResize(violinNode);
     });
   } catch (error) {
     handleError(error);
@@ -877,4 +1046,21 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', bootstrap);
 } else {
   bootstrap();
+}
+function schedulePlotResize(container) {
+  if (!container || !globalThis.Plotly?.Plots?.resize) {
+    return;
+  }
+  const resize = () => {
+    try {
+      globalThis.Plotly.Plots.resize(container);
+    } catch (_error) {
+      // ignore
+    }
+  };
+  if (typeof window !== 'undefined' && window.requestAnimationFrame) {
+    window.requestAnimationFrame(resize);
+  } else {
+    setTimeout(resize, 0);
+  }
 }

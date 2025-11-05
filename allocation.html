@@ -41,21 +41,75 @@
         flex: 1;
         min-width: 260px;
       }
-      #weights-editor .weight-row {
-        margin-bottom: 0.5rem;
-      }
-      #weights-editor label {
+      #weights-editor {
         display: flex;
-        justify-content: space-between;
-        gap: 0.5rem;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+      #weights-editor .weight-row {
+        padding: 0.35rem 0.5rem;
+        border-radius: 6px;
+        background: #f8fafc;
+        border: 1px solid #dbeafe;
+      }
+      #weights-editor .weight-label {
+        display: grid;
+        grid-template-columns: minmax(110px, 1fr) auto;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      #weights-editor .weight-label-text {
+        font-weight: 600;
+        color: #0f172a;
       }
       #weights-editor input {
-        width: 120px;
+        width: 130px;
+        text-align: right;
+      }
+      #weights-editor .weights-editor-empty {
+        margin: 0;
+        font-style: italic;
+        color: #475569;
       }
       .allocation-editor-actions {
         display: flex;
         gap: 0.5rem;
         margin-top: 0.75rem;
+      }
+      .chart-container {
+        width: 100%;
+      }
+      .plot-area {
+        width: 100%;
+        min-height: 400px;
+      }
+      #ticker-selection-panel {
+        margin-bottom: 1.5rem;
+      }
+      #ticker-selection-panel table {
+        margin-top: 0.75rem;
+        border-collapse: collapse;
+        min-width: 320px;
+        max-width: 720px;
+        border: 1px solid #cbd5e1;
+      }
+      #ticker-selection-panel th,
+      #ticker-selection-panel td {
+        padding: 6px 10px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.6);
+        text-align: left;
+      }
+      #ticker-selection-panel th:not(:last-child),
+      #ticker-selection-panel td:not(:last-child) {
+        border-right: 1px solid rgba(148, 163, 184, 0.6);
+      }
+      #ticker-selection-panel th[data-column="data-since"],
+      #ticker-selection-panel td[data-column="data-since"] {
+        white-space: nowrap;
+      }
+      #ticker-selection-status {
+        margin-top: 0.5rem;
+        font-size: 0.95rem;
       }
     </style>
   </head>
@@ -74,17 +128,27 @@
         We simulate the results for this strategy when applied to every day in our experimental
         window.
       </p>
+      <section id="ticker-selection-panel">
+        <h2>Select Tickers</h2>
+        <p>
+          Choose the securities to include in the simulation. The available date range updates automatically based on this selection and the chosen currency.
+        </p>
+        <div id="ticker-selection"></div>
+        <p id="ticker-selection-status" class="selection-status"></p>
+      </section>
       <form id="allocation-form">
         <div>
           <label>
             Start day (inclusive)
-            <input id="lower-bound" name="lower-bound" type="date" required />
+            <input id="lower-bound" name="lower-bound" type="date" required readonly />
+            <small>Calculated automatically from the selected tickers.</small>
           </label>
         </div>
         <div>
           <label>
             End day (inclusive)
-            <input id="upper-bound" name="upper-bound" type="date" required />
+            <input id="upper-bound" name="upper-bound" type="date" required readonly />
+            <small>Calculated automatically from the selected tickers.</small>
           </label>
         </div>
         <div>
@@ -129,13 +193,13 @@
         </section>
       </form>
       <div id="allocation-status" class="allocation-status"></div>
-      <section id="allocation-violin-section" hidden>
+      <section id="allocation-violin-section" class="chart-container" hidden>
         <h2>PnL Distribution</h2>
-        <div id="allocation-violin" style="width: 100%; max-width: 960px; min-height: 400px;"></div>
+        <div id="allocation-violin" class="plot-area"></div>
       </section>
-      <section id="allocation-chart-section" hidden>
+      <section id="allocation-chart-section" class="chart-container" hidden>
         <h2>Profit and Loss</h2>
-        <div id="allocation-chart" style="width: 100%; max-width: 960px; min-height: 400px;"></div>
+        <div id="allocation-chart" class="plot-area"></div>
       </section>
     </main>
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" crossorigin="anonymous"></script>

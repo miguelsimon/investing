@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Stocks Simulator</title>
     <script src="./google-tag.js" defer></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: sans-serif;
+      }
+      main {
+        padding: 1rem;
+      }
+      .plot-area {
+        width: 100%;
+        min-height: 400px;
+      }
+    </style>
   </head>
   <body>
     <main>
@@ -12,7 +25,7 @@
       <section id="summary" hidden></section>
       <section id="chart-section" hidden>
         <h2>Constant-Dollar Growth</h2>
-        <div id="growth-chart" style="width: 100%; max-width: 960px;"></div>
+        <div id="growth-chart" class="plot-area"></div>
       </section>
     </main>
     <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" crossorigin="anonymous"></script>
