@@ -1,8 +1,10 @@
-This runs simulations on historical data to backtest a simple investment strategy.
+This runs simulations on historical data to backtest a simple investment strategy:
+1. we buy 1 constant dollars of a portfolio on `day=d`
+2. we wait for `holding_time` days
+3. we sell the portfolio on `day=d + holding_time` and calculate its value in constant dollars
 
-The strategy is:
+The chart plots the percentage profit/loss for each portfolio at each day's simulation start:
 
-* choose a holding time for the investment (default 1 year)
-* choose a weight allocation
-
-We simulate the results for this strategy when applied to every day in our experimental window.
+```
+y(day=d, portfolio) = 100 * (value_constant_usd(day=d + holding_time, portfolio) - 1)
+```

@@ -18,7 +18,6 @@ const form = document.getElementById('allocation-form');
 const lowerBoundInput = document.getElementById('lower-bound');
 const upperBoundInput = document.getElementById('upper-bound');
 const holdingInput = document.getElementById('holding-days');
-const initialCapitalInput = document.getElementById('initial-capital');
 const allocationList = document.getElementById('allocation-list');
 const addAllocationButton = document.getElementById('add-allocation');
 const editorTitle = document.getElementById('allocation-editor-title');
@@ -37,6 +36,7 @@ const tickerSelectionStatus = document.getElementById('ticker-selection-status')
 const descriptionContainer = document.getElementById('allocation-description-content');
 
 const DEFAULT_CURRENCY = 'USD';
+const INITIAL_CAPITAL = 1;
 const CURRENCY_LABELS = { USD: 'constant USD', EUR: 'constant EUR' };
 const CURRENCY_UNITS = { USD: 'USD', EUR: 'EUR' };
 
@@ -589,7 +589,7 @@ function addAllocation() {
   editorSummary.textContent = 'New allocation created. Adjust weights and save.';
 }
 
-function renderChart(seriesCollection, startCapital, currency) {
+function renderChart(seriesCollection, currency) {
   if (!chartNode) {
     return;
   }
@@ -600,101 +600,29 @@ function renderChart(seriesCollection, startCapital, currency) {
     return;
   }
 
-  const denominator = startCapital > 0 ? startCapital : 1;
-  const unit = getCurrencyUnit(currency);
-  const label = getCurrencyLabel(currency);
-  let minPercent = 0;
-  let maxPercent = 0;
-  const absolutePnL = [];
-
   const traces = seriesCollection.map((series, index) => {
     const xValues = series.map((entry) => entry.day);
-    const pnlValues = series.map((entry) => entry.pnl);
-    const pnlPercent = pnlValues.map((value) => (value / denominator) * 100);
-
-    absolutePnL.push(...pnlValues);
-
-    minPercent = Math.min(minPercent, ...pnlPercent);
-    maxPercent = Math.max(maxPercent, ...pnlPercent);
-
+    const percentPnL = series.map((entry) => (entry.pnl / INITIAL_CAPITAL) * 100);
     return {
       name: series.label ?? `Allocation ${index + 1}`,
       x: xValues,
-      y: pnlValues,
+      y: percentPnL,
       type: 'scatter',
       mode: 'lines',
-      hovertemplate: `<b>%{x}</b><br />PnL: %{y:.2f} ${unit}<extra></extra>`,
+      hovertemplate: '<b>%{x}</b><br />PnL: %{y:.2f}%<extra></extra>',
     };
   });
 
-  absolutePnL.push(0);
-  let minValue = Math.min(...absolutePnL);
-  let maxValue = Math.max(...absolutePnL);
-
-  if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
-    minValue = 0;
-    maxValue = 0;
-  }
-  if (minValue === maxValue) {
-    const span = Math.max(Math.abs(minValue), 1);
-    minValue -= span;
-    maxValue += span;
-  }
-
-  const origin = 0;
-  minValue = Math.min(minValue, origin);
-  maxValue = Math.max(maxValue, origin);
-
-  const tickTarget = 6;
-  const span = maxValue - minValue;
-  const step = span <= 0 ? 1 : span / (tickTarget - 1);
-  const tickCandidates = [];
-  for (let i = 0; i < tickTarget; i += 1) {
-    tickCandidates.push(minValue + step * i);
-  }
-  tickCandidates.push(origin, maxValue);
-  const valueTicks = Array.from(new Set(tickCandidates)).sort((a, b) => a - b);
-  const percentTickText = valueTicks.map((tickValue) => {
-    const percent = (tickValue / denominator) * 100;
-    const magnitude = Math.abs(percent);
-    const precision = magnitude < 1 ? 2 : magnitude < 10 ? 1 : 0;
-    return `${percent.toFixed(precision)}%`;
-  });
-  console.debug('plot ticks', {
-    minValue,
-    maxValue,
-    origin,
-    valueTicks,
-    percentTickText,
-    denominator,
-  });
-
-  const stubX = valueTicks.map(() => seriesCollection[0][0]?.day ?? null);
-  const y2StubTrace = {
-    x: stubX,
-    y: valueTicks,
-    yaxis: 'y2',
-    type: 'scatter',
-    mode: 'lines',
-    line: { width: 0 },
-    hoverinfo: 'skip',
-    showlegend: false,
-  };
-
   const layout = {
-    title: `Start-Day P&L (${label})`,
+    title: `Start-Day P&L (${getCurrencyLabel(currency)})`,
     xaxis: { title: 'Start day' },
-    yaxis: { title: `PnL (${label})` },
-    yaxis2: {
+    yaxis: {
       title: 'PnL (%)',
-      overlaying: 'y',
-      side: 'right',
-      tickmode: 'array',
-      tickvals: valueTicks,
-      ticktext: percentTickText,
-      showgrid: false,
+      zeroline: true,
+      zerolinecolor: '#94a3b8',
+      ticksuffix: '%',
     },
-    margin: { t: 50, r: 140, b: 60, l: 160 },
+    margin: { t: 50, r: 60, b: 60, l: 100 },
   };
 
   const config = { responsive: true };
@@ -703,12 +631,12 @@ function renderChart(seriesCollection, startCapital, currency) {
     labels: traces.map((trace) => trace.name),
     currency,
   });
-  globalThis.Plotly.react(chartNode, [...traces, y2StubTrace], layout, config);
+  globalThis.Plotly.react(chartNode, traces, layout, config);
   chartSection.hidden = false;
   schedulePlotResize(chartNode);
 }
 
-function renderViolin(seriesCollection, startCapital, currency) {
+function renderViolin(seriesCollection, currency) {
   if (!violinNode) {
     return;
   }
@@ -722,7 +650,7 @@ function renderViolin(seriesCollection, startCapital, currency) {
   const labels = seriesCollection.map((series, index) => series.label ?? `Allocation ${index + 1}`);
 
   const traces = seriesCollection.map((series, index) => {
-    const percentPnL = series.map((entry) => (entry.pnl / startCapital) * 100);
+    const percentPnL = series.map((entry) => (entry.pnl / INITIAL_CAPITAL) * 100);
     const label = labels[index];
     return {
       name: label,
@@ -746,11 +674,18 @@ function renderViolin(seriesCollection, startCapital, currency) {
       autorange: 'reversed',
       categoryorder: 'array',
       categoryarray: labels,
+      showticklabels: false,
     },
     violingap: 0.2,
     violingroupgap: 0.3,
     margin: { t: 50, r: 100, b: 60, l: 160 },
-    legend: { orientation: 'h' },
+    legend: {
+      orientation: 'v',
+      x: 1.02,
+      xanchor: 'left',
+      y: 0.5,
+      yanchor: 'middle',
+    },
   };
 
   const config = { responsive: true };
@@ -763,7 +698,7 @@ function renderViolin(seriesCollection, startCapital, currency) {
   schedulePlotResize(violinNode);
 }
 
-function summarizeResults(results, startCapital, currency) {
+function summarizeResults(results, currency) {
   if (!statusNode) {
     return;
   }
@@ -803,7 +738,7 @@ function summarizeResults(results, startCapital, currency) {
   table.appendChild(thead);
 
   const tbody = document.createElement('tbody');
-  const denominator = startCapital > 0 ? startCapital : 1;
+  const denominator = INITIAL_CAPITAL;
 
   results.forEach((series, index) => {
     const label = series.label ?? `Allocation ${index + 1}`;
@@ -897,10 +832,7 @@ async function runSimulations() {
     return;
   }
   try {
-    const initialCapital = Number(initialCapitalInput.value);
-    if (!Number.isFinite(initialCapital) || initialCapital <= 0) {
-      throw new Error('Initial capital must be a positive number');
-    }
+    const initialCapital = INITIAL_CAPITAL;
 
     const holdingDays = Number.parseInt(holdingInput.value, 10);
     if (!Number.isFinite(holdingDays) || holdingDays <= 0) {
@@ -949,9 +881,9 @@ async function runSimulations() {
       plottedSeries.map((series) => ({ label: series.label, points: series.length })),
       { currency },
     );
-    summarizeResults(plottedSeries, initialCapital, currency);
-    renderChart(plottedSeries, initialCapital, currency);
-    renderViolin(plottedSeries, initialCapital, currency);
+    summarizeResults(plottedSeries, currency);
+    renderChart(plottedSeries, currency);
+    renderViolin(plottedSeries, currency);
   } catch (error) {
     handleError(error);
   }
@@ -980,7 +912,6 @@ async function bootstrap() {
     !lowerBoundInput ||
     !upperBoundInput ||
     !holdingInput ||
-    !initialCapitalInput ||
     !allocationList ||
     !addAllocationButton ||
     !weightsEditor ||
@@ -1031,7 +962,6 @@ async function bootstrap() {
       }
     });
     holdingInput.addEventListener('change', scheduleRun);
-    initialCapitalInput.addEventListener('change', scheduleRun);
     currencyRadios.forEach((radio) => {
       radio.addEventListener('change', () => {
         selectedCurrency = resolveSelectedCurrency();
