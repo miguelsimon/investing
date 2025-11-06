@@ -1,3 +1,4 @@
+import { escapeHtml, renderMarkdown } from './markdown.js';
 import { initNavigation } from './navigation.js';
 import { fetchProblem } from './problemData.js';
 import {
@@ -33,6 +34,7 @@ const violinNode = document.getElementById('allocation-violin');
 const currencyRadios = document.querySelectorAll('input[name="currency"]');
 const tickerSelectionContainer = document.getElementById('ticker-selection');
 const tickerSelectionStatus = document.getElementById('ticker-selection-status');
+const descriptionContainer = document.getElementById('allocation-description-content');
 
 const DEFAULT_CURRENCY = 'USD';
 const CURRENCY_LABELS = { USD: 'constant USD', EUR: 'constant EUR' };
@@ -52,6 +54,25 @@ let allocationIdCounter = 1;
 let runTimeoutId = null;
 let currentRange = null;
 const ALLOCATION_LABEL_MAX = 20;
+
+async function loadAllocationDescription() {
+  if (!descriptionContainer) {
+    return;
+  }
+  try {
+    const response = await fetch('allocation.md', { headers: { Accept: 'text/plain' } });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const text = await response.text();
+    const html = renderMarkdown(text);
+    descriptionContainer.innerHTML = html || '<p>Overview not available.</p>';
+  } catch (error) {
+    descriptionContainer.innerHTML = `<p>Error loading overview: ${escapeHtml(error.message)}</p>`;
+  }
+}
+
+loadAllocationDescription();
 
 function setDateInputValue(input, value) {
   if (!(input instanceof HTMLInputElement)) {

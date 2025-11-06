@@ -86,6 +86,19 @@
       #ticker-selection-panel {
         margin-bottom: 1.5rem;
       }
+      #allocation-description {
+        margin-bottom: 1.5rem;
+        max-width: 720px;
+      }
+      #allocation-description-content p {
+        margin: 0 0 0.75rem;
+      }
+      #allocation-description-content ul {
+        margin: 0 0 0.75rem 1.5rem;
+      }
+      #allocation-description-content li {
+        margin-bottom: 0.35rem;
+      }
       #ticker-selection-panel table {
         margin-top: 0.75rem;
         border-collapse: collapse;
@@ -116,18 +129,11 @@
   <body>
     <main>
       <h1>Allocation Simulator</h1>
-      <p>
-        This runs simulations on historical data to backtest a simple investment strategy.
-      </p>
-      <p>The strategy is:</p>
-      <ul>
-        <li>choose a holding time for the investment (default 1 year)</li>
-        <li>choose a weight allocation</li>
-      </ul>
-      <p>
-        We simulate the results for this strategy when applied to every day in our experimental
-        window.
-      </p>
+      <section id="allocation-description">
+        <div id="allocation-description-content">
+          Loading allocation overview…
+        </div>
+      </section>
       <section id="ticker-selection-panel">
         <h2>Select Tickers</h2>
         <p>
