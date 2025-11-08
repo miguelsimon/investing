@@ -124,9 +124,8 @@
         font-size: 0.95rem;
       }
     </style>
-    <script type="module" crossorigin src="./assets/allocation-nLvY99hN.js"></script>
+    <script type="module" crossorigin src="./assets/allocation-D5Zjuc-Z.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/navigation-CXrC8Ner.js">
-    <link rel="modulepreload" crossorigin href="./assets/markdown-BYZln54M.js">
     <link rel="modulepreload" crossorigin href="./assets/problemView-DNxSRx9J.js">
   </head>
   <body>
@@ -134,7 +133,9 @@
       <h1>Allocation Simulator</h1>
       <section id="allocation-description">
         <div id="allocation-description-content">
-          Loading allocation overview…
+          <!-- @md:allocation:start -->
+          <p>This runs simulations on historical data to backtest a simple investment strategy:</p><ol><li>we buy 1 constant dollars of a portfolio on <code>day=d</code></li><li>we wait for <code>holding_time</code> days</li><li>we sell the portfolio on <code>day=d + holding_time</code> and calculate its value in constant dollars</li></ol><p>The chart plots the percentage profit/loss for each portfolio at each day&#39;s simulation start:</p><pre><code>y(day=d, portfolio) = 100 * (value_constant_usd(day=d + holding_time, portfolio) - 1)</code></pre>
+          <!-- @md:allocation:end -->
         </div>
       </section>
       <section id="ticker-selection-panel">
