@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Buffett Indicator</title>
+    <script src="./google-tag.js" defer></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+        color: #0f172a;
+      }
+      main {
+        padding: 1.25rem;
+        margin: 0 auto;
+        max-width: 1200px;
+      }
+      h1 {
+        margin-bottom: 0.35rem;
+      }
+      #buffet-description {
+        margin-bottom: 1.5rem;
+      }
+      #buffet-description-content p {
+        margin: 0 0 0.75rem;
+      }
+      .status {
+        margin: 1rem 0;
+        font-style: italic;
+        color: #475569;
+      }
+      .chart-container {
+        margin-top: 1.5rem;
+        width: 100%;
+      }
+      .plot-area {
+        width: 100%;
+        min-height: 480px;
+      }
+    </style>
+    <script type="module" crossorigin src="./assets/buffetIndicator-Ash7mmAs.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/navigation-Dd9V-wtP.js">
+    <link rel="modulepreload" crossorigin href="./assets/markdown-BYZln54M.js">
+  </head>
+  <body>
+    <main>
+      <h1>Buffett Indicator</h1>
+      <section id="buffet-description">
+        <div id="buffet-description-content">
+          Loading description…
+        </div>
+      </section>
+      <p id="status" class="status">Loading Buffett indicator dataset…</p>
+      <section id="buffet-chart-section" class="chart-container" hidden>
+        <h2>Market Cap vs. GDP</h2>
+        <div id="buffet-chart" class="plot-area"></div>
+      </section>
+    </main>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js" crossorigin="anonymous"></script>
+  </body>
+</html>
